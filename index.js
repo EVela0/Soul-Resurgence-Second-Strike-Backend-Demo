@@ -1,3 +1,14 @@
+const express = require("express");
+const app = express();
+
+app.use(express.json());
+
+let rooms = {};
+
+function generateCode() {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
 app.get("/", (_req, res) => {
     res.send("Backend is live");
 });
@@ -33,7 +44,7 @@ app.post("/join_room", (req, res) => {
         return res.status(409).json({
             success: false,
             message: "Room full"
-        })
+        });
     }
 
     rooms[room_code].guest = player_id;
