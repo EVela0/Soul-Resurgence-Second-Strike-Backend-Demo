@@ -1,22 +1,21 @@
-const express = require("express");
-const app = express();
-app.use(express.json());
-
-let rooms = {};
-
-function generateCode() {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
-}
+app.get("/", (_req, res) => {
+    res.send("Backend is live");
+});
 
 app.post("/create_room", (req, res) => {
     const code = generateCode();
 
     rooms[code] = {
-        host: req.body.player_id,
-        guest: null
+        host: req.body.player_id || "host_player",
+        guest: null,
+        status: "waiting"
     };
 
-    res.json({ room_code: code });
+    res.json({
+        success: true,
+        room_code: code,
+        message: "Room created"
+    });
 });
 
 app.post("/join_room", (req, res) => {
@@ -34,7 +33,7 @@ app.post("/join_room", (req, res) => {
         return res.status(409).json({
             success: false,
             message: "Room full"
-        });
+        })
     }
 
     rooms[room_code].guest = player_id;
@@ -63,5 +62,3 @@ app.post("/room_status", (req, res) => {
         status: rooms[room_code].status
     });
 });
-
-app.listen(3000, () => console.log("Server running"));
