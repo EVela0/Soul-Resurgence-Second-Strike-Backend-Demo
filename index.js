@@ -18,13 +18,17 @@ app.post("/create_room", (req, res) => {
 
     rooms[code] = {
         host: req.body.player_id || "host_player",
+        host_tag: req.body.gamertag || "Player One",
         guest: null,
+        guest_tag: null,
         status: "waiting"
     };
 
     res.json({
         success: true,
         room_code: code,
+        host_tag: rooms[code].host_tag,
+        guest_tag: rooms[code].guest_tag,
         message: "Room created"
     });
 });
@@ -32,6 +36,7 @@ app.post("/create_room", (req, res) => {
 app.post("/join_room", (req, res) => {
     const room_code = String(req.body.room_code || "").toUpperCase();
     const player_id = req.body.player_id || "guest_player";
+    const gamertag = req.body.gamertag || "Player Two";
 
     if (!rooms[room_code]) {
         return res.status(404).json({
@@ -48,11 +53,14 @@ app.post("/join_room", (req, res) => {
     }
 
     rooms[room_code].guest = player_id;
+    rooms[room_code].guest_tag = gamertag;
     rooms[room_code].status = "full";
 
     res.json({
         success: true,
         room_code: room_code,
+        host_tag: rooms[room_code].host_tag,
+        guest_tag: rooms[room_code].guest_tag,
         message: "Joined room"
     });
 });
@@ -70,7 +78,9 @@ app.post("/room_status", (req, res) => {
     res.json({
         success: true,
         room_code: room_code,
-        status: rooms[room_code].status
+        status: rooms[room_code].status,
+        host_tag: rooms[room_code].host_tag,
+        guest_tag: rooms[room_code].guest_tag
     });
 });
 
