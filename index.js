@@ -20,15 +20,48 @@ app.post("/create_room", (req, res) => {
 });
 
 app.post("/join_room", (req, res) => {
-    const { room_code, player_id } = req.body;
+    const room_code = String(req.body.room_code || "").toUpperCase();
+    const player_id = req.body.player_id || "guest_player";
 
     if (!rooms[room_code]) {
-        return res.json({ success: false });
+        return res.status(404).json({
+            success: false,
+            message: "Room not found"
+        });
+    }
+
+    if (rooms[room_code].guest !== null) {
+        return res.status(409).json({
+            success: false,
+            message: "Room full"
+        });
     }
 
     rooms[room_code].guest = player_id;
+    rooms[room_code].status = "full";
 
-    res.json({ success: true });
+    res.json({
+        success: true,
+        room_code: room_code,
+        message: "Joined room"
+    });
+});
+
+app.post("/room_status", (req, res) => {
+    const room_code = String(req.body.room_code || "").toUpperCase();
+
+    if (!rooms[room_code]) {
+        return res.status(404).json({
+            success: false,
+            message: "Room not found"
+        });
+    }
+
+    res.json({
+        success: true,
+        room_code: room_code,
+        status: rooms[room_code].status
+    });
 });
 
 app.listen(3000, () => console.log("Server running"));
