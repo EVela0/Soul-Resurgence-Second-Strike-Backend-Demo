@@ -19,7 +19,9 @@ function defaultPlayerState(side) {
         vel_x: 0.0,
         anim: "idle",
         hp: 1000,
-        max_hp: 1000
+        max_hp: 1000,
+        state_seq: 0,
+        updated_at: Date.now()
     };
 }
 
@@ -52,20 +54,55 @@ function ensureFightState(room) {
     }
 }
 
-function sanitizeState(raw, forcedPlayerId) {
+function safeNumber(value, fallback) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+}
+
+function safeString(value, fallback) {
+    if (value === undefined || value === null) {
+        return fallback;
+    }
+    return String(value);
+}
+
+function sanitizeState(raw, forcedPlayerId, previousState) {
+    const prev = previousState || defaultPlayerState(forcedPlayerId);
     const src = raw || {};
+
+    const maxHp = Math.max(
+        1,
+        safeNumber(src.max_hp, prev.max_hp)
+    );
+
+    let hp = safeNumber(src.hp, prev.hp);
+    hp = Math.max(0, Math.min(hp, maxHp));
+
+    const nextSeq = Math.max(
+        safeNumber(src.state_seq, prev.state_seq + 1),
+        prev.state_seq
+    );
 
     return {
         player_id: forcedPlayerId,
-        x: Number(src.x ?? 0),
-        y: Number(src.y ?? 0),
-        z: Number(src.z ?? 0),
-        rot_y: Number(src.rot_y ?? 0),
-        vel_x: Number(src.vel_x ?? 0),
-        anim: String(src.anim ?? "idle"),
-        hp: Number(src.hp ?? 1000),
-        max_hp: Number(src.max_hp ?? 1000)
+        x: safeNumber(src.x, prev.x),
+        y: safeNumber(src.y, prev.y),
+        z: safeNumber(src.z, prev.z),
+        rot_y: safeNumber(src.rot_y, prev.rot_y),
+        vel_x: safeNumber(src.vel_x, prev.vel_x),
+        anim: safeString(src.anim, prev.anim),
+        hp: hp,
+        max_hp: maxHp,
+        state_seq: nextSeq,
+        updated_at: Date.now()
     };
+}
+
+function shouldAcceptState(incomingRaw, currentState) {
+    const currentSeq = safeNumber(currentState?.state_seq, 0);
+    const incomingSeq = safeNumber(incomingRaw?.state_seq, currentSeq + 1);
+
+    return incomingSeq >= currentSeq;
 }
 
 function makeRole(room, requesterId) {
@@ -281,9 +318,15 @@ app.post("/update_fight_state", (req, res) => {
     ensureFightState(room);
 
     if (requester_id === room.host) {
-        room.fight_state.p1_state = sanitizeState(state, 1);
+        const current = room.fight_state.p1_state;
+        if (shouldAcceptState(state, current)) {
+            room.fight_state.p1_state = sanitizeState(state, 1, current);
+        }
     } else if (requester_id === room.guest) {
-        room.fight_state.p2_state = sanitizeState(state, 2);
+        const current = room.fight_state.p2_state;
+        if (shouldAcceptState(state, current)) {
+            room.fight_state.p2_state = sanitizeState(state, 2, current);
+        }
     } else {
         return res.status(403).json({
             success: false,
