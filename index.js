@@ -1,36 +1,36 @@
-const express = require("express"); // express
-const app = express(); // app
+const express = require("express");
+const app = express();
 
-app.use(express.json()); // json bodies
+app.use(express.json());
 
-let rooms = {}; // in-memory rooms
+let rooms = {};
 
 function generateCode() {
-    return Math.random().toString(36).substring(2, 8).toUpperCase(); // room code
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
 function defaultPlayerState(side) {
     return {
-        player_id: side, // side id
-        x: side === 1 ? -2.0 : 2.0, // default x
-        y: 0.0, // default y
-        z: 0.0, // default z
-        rot_y: side === 1 ? 0.0 : 3.14159265359, // default facing
-        vel_x: 0.0, // horizontal speed
-        anim: "idle", // animation
-        hp: 1000, // current hp
-        max_hp: 1000 // max hp
+        player_id: side,
+        x: side === 1 ? -2.0 : 2.0,
+        y: 0.0,
+        z: 0.0,
+        rot_y: side === 1 ? 0.0 : 3.14159265359,
+        vel_x: 0.0,
+        anim: "idle",
+        hp: 1000,
+        max_hp: 1000
     };
 }
 
 function ensureCharSelect(room) {
     if (!room.char_select) {
         room.char_select = {
-            p1_raw: "", // host raw name
-            p1_id: "", // host fighter id
-            p2_raw: "", // guest raw name
-            p2_id: "", // guest fighter id
-            stage_path: "" // stage
+            p1_raw: "",
+            p1_id: "",
+            p2_raw: "",
+            p2_id: "",
+            stage_path: ""
         };
     }
 }
@@ -38,282 +38,280 @@ function ensureCharSelect(room) {
 function ensureFightState(room) {
     if (!room.fight_state) {
         room.fight_state = {
-            p1_state: defaultPlayerState(1), // p1 state
-            p2_state: defaultPlayerState(2) // p2 state
+            p1_state: defaultPlayerState(1),
+            p2_state: defaultPlayerState(2)
         };
     }
 
     if (!room.fight_state.p1_state) {
-        room.fight_state.p1_state = defaultPlayerState(1); // repair p1
+        room.fight_state.p1_state = defaultPlayerState(1);
     }
 
     if (!room.fight_state.p2_state) {
-        room.fight_state.p2_state = defaultPlayerState(2); // repair p2
+        room.fight_state.p2_state = defaultPlayerState(2);
     }
 }
 
 function sanitizeState(raw, forcedPlayerId) {
-    const src = raw || {}; // incoming state
+    const src = raw || {};
 
     return {
-        player_id: forcedPlayerId, // force side
-        x: Number(src.x ?? 0), // x
-        y: Number(src.y ?? 0), // y
-        z: Number(src.z ?? 0), // z
-        rot_y: Number(src.rot_y ?? 0), // rotation
-        vel_x: Number(src.vel_x ?? 0), // horizontal velocity
-        anim: String(src.anim ?? "idle"), // animation
-        hp: Number(src.hp ?? 1000), // hp
-        max_hp: Number(src.max_hp ?? 1000) // max hp
+        player_id: forcedPlayerId,
+        x: Number(src.x ?? 0),
+        y: Number(src.y ?? 0),
+        z: Number(src.z ?? 0),
+        rot_y: Number(src.rot_y ?? 0),
+        vel_x: Number(src.vel_x ?? 0),
+        anim: String(src.anim ?? "idle"),
+        hp: Number(src.hp ?? 1000),
+        max_hp: Number(src.max_hp ?? 1000)
     };
 }
 
 function makeRole(room, requesterId) {
-    const who = String(requesterId || ""); // requester
+    const who = String(requesterId || "");
     if (who !== "" && who === room.host) {
-        return { is_host: true, assigned_side: 1 }; // host role
+        return { is_host: true, assigned_side: 1 };
     }
     if (who !== "" && who === room.guest) {
-        return { is_host: false, assigned_side: 2 }; // guest role
+        return { is_host: false, assigned_side: 2 };
     }
-    return { is_host: false, assigned_side: 0 }; // unknown
+    return { is_host: false, assigned_side: 0 };
 }
 
 function makeRoomState(room, requesterId) {
-    ensureCharSelect(room); // char select exists
-    ensureFightState(room); // fight state exists
+    ensureCharSelect(room);
+    ensureFightState(room);
 
     const both_locked =
         room.char_select.p1_id !== "" &&
-        room.char_select.p2_id !== ""; // both fighters picked
+        room.char_select.p2_id !== "";
 
-    const role = makeRole(room, requesterId); // role for requester
+    const role = makeRole(room, requesterId);
 
     return {
-        success: true, // success
-        room_code: room.code, // room code
-        status: room.status, // room status
-        host_tag: room.host_tag || "Player One", // host tag
-        guest_tag: room.guest_tag || "Player Two", // guest tag
-        host: room.host || null, // host id
-        guest: room.guest || null, // guest id
-        p1_raw: room.char_select.p1_raw, // p1 raw name
-        p1_id: room.char_select.p1_id, // p1 fighter id
-        p2_raw: room.char_select.p2_raw, // p2 raw name
-        p2_id: room.char_select.p2_id, // p2 fighter id
-        stage_path: room.char_select.stage_path, // stage path
-        both_locked: both_locked, // both selected
-        is_host: role.is_host, // requester role
-        assigned_side: role.assigned_side, // requester side
-        p1_state: room.fight_state.p1_state, // p1 live state
-        p2_state: room.fight_state.p2_state // p2 live state
+        success: true,
+        room_code: room.code,
+        status: room.status,
+        host_tag: room.host_tag || "Player One",
+        guest_tag: room.guest_tag || "Player Two",
+        p1_raw: room.char_select.p1_raw,
+        p1_id: room.char_select.p1_id,
+        p2_raw: room.char_select.p2_raw,
+        p2_id: room.char_select.p2_id,
+        stage_path: room.char_select.stage_path,
+        both_locked: both_locked,
+        is_host: role.is_host,
+        assigned_side: role.assigned_side,
+        p1_state: room.fight_state.p1_state,
+        p2_state: room.fight_state.p2_state
     };
 }
 
 app.get("/", (_req, res) => {
-    res.send("Backend is live"); // health check
+    res.send("Backend is live");
 });
 
 app.post("/create_room", (req, res) => {
-    const code = generateCode(); // room code
-    const hostId = String(req.body.player_id || ("host_" + Date.now())); // host id
-    const hostTag = String(req.body.gamertag || "Player One"); // host tag
+    const code = generateCode();
+    const hostId = String(req.body.player_id || ("host_" + Date.now()));
+    const hostTag = String(req.body.gamertag || "Player One");
 
     rooms[code] = {
-        code: code, // room code
-        host: hostId, // host id
-        host_tag: hostTag, // host tag
-        guest: null, // guest id
-        guest_tag: "Player Two", // guest tag
-        status: "waiting", // waiting status
+        code: code,
+        host: hostId,
+        host_tag: hostTag,
+        guest: null,
+        guest_tag: "Player Two",
+        status: "waiting",
         char_select: {
-            p1_raw: "", // p1 raw
-            p1_id: "", // p1 id
-            p2_raw: "", // p2 raw
-            p2_id: "", // p2 id
-            stage_path: "" // stage
+            p1_raw: "",
+            p1_id: "",
+            p2_raw: "",
+            p2_id: "",
+            stage_path: ""
         },
         fight_state: {
-            p1_state: defaultPlayerState(1), // p1 state
-            p2_state: defaultPlayerState(2) // p2 state
+            p1_state: defaultPlayerState(1),
+            p2_state: defaultPlayerState(2)
         }
     };
 
     res.json({
-        success: true, // success
-        room_code: code, // code
-        host_tag: rooms[code].host_tag, // host tag
-        guest_tag: rooms[code].guest_tag, // guest tag
-        is_host: true, // creator host
-        assigned_side: 1, // creator p1
-        message: "Room created" // message
+        success: true,
+        room_code: code,
+        host_tag: rooms[code].host_tag,
+        guest_tag: rooms[code].guest_tag,
+        is_host: true,
+        assigned_side: 1,
+        message: "Room created"
     });
 });
 
 app.post("/join_room", (req, res) => {
-    const room_code = String(req.body.room_code || "").toUpperCase(); // room code
-    const player_id = String(req.body.player_id || ("guest_" + Date.now())); // guest id
-    const gamertag = String(req.body.gamertag || "Player Two"); // guest tag
+    const room_code = String(req.body.room_code || "").toUpperCase();
+    const player_id = String(req.body.player_id || ("guest_" + Date.now()));
+    const gamertag = String(req.body.gamertag || "Player Two");
 
     if (!rooms[room_code]) {
         return res.status(404).json({
-            success: false, // fail
-            message: "Room not found" // message
+            success: false,
+            message: "Room not found"
         });
     }
 
-    const room = rooms[room_code]; // room
+    const room = rooms[room_code];
 
     if (room.guest !== null && room.guest !== player_id) {
         return res.status(409).json({
-            success: false, // fail
-            message: "Room full" // message
+            success: false,
+            message: "Room full"
         });
     }
 
-    room.guest = player_id; // save guest
-    room.guest_tag = gamertag; // save guest tag
-    room.status = "full"; // now full
+    room.guest = player_id;
+    room.guest_tag = gamertag;
+    room.status = "full";
 
     res.json({
-        success: true, // success
-        room_code: room_code, // code
-        host_tag: room.host_tag, // host tag
-        guest_tag: room.guest_tag, // guest tag
-        is_host: false, // joiner guest
-        assigned_side: 2, // joiner p2
-        message: "Joined room" // message
+        success: true,
+        room_code: room_code,
+        host_tag: room.host_tag,
+        guest_tag: room.guest_tag,
+        is_host: false,
+        assigned_side: 2,
+        message: "Joined room"
     });
 });
 
 app.post("/room_status", (req, res) => {
-    const room_code = String(req.body.room_code || "").toUpperCase(); // room code
-    const requester_id = String(req.body.player_id || ""); // requester
+    const room_code = String(req.body.room_code || "").toUpperCase();
+    const requester_id = String(req.body.player_id || "");
 
     if (!rooms[room_code]) {
         return res.status(404).json({
-            success: false, // fail
-            message: "Room not found" // message
+            success: false,
+            message: "Room not found"
         });
     }
 
-    const room = rooms[room_code]; // room
-    res.json(makeRoomState(room, requester_id)); // full state
+    const room = rooms[room_code];
+    res.json(makeRoomState(room, requester_id));
 });
 
 app.post("/character_select_state", (req, res) => {
-    const room_code = String(req.body.room_code || "").toUpperCase(); // room code
-    const requester_id = String(req.body.player_id || ""); // requester
+    const room_code = String(req.body.room_code || "").toUpperCase();
+    const requester_id = String(req.body.player_id || "");
 
     if (!rooms[room_code]) {
         return res.status(404).json({
-            success: false, // fail
-            message: "Room not found" // message
+            success: false,
+            message: "Room not found"
         });
     }
 
-    const room = rooms[room_code]; // room
-    res.json(makeRoomState(room, requester_id)); // full select state
+    const room = rooms[room_code];
+    res.json(makeRoomState(room, requester_id));
 });
 
 app.post("/select_character", (req, res) => {
-    const room_code = String(req.body.room_code || "").toUpperCase(); // room code
-    const requester_id = String(req.body.player_id || ""); // requester
-    const fighter_raw = String(req.body.fighter_raw || ""); // raw name
-    const fighter_id = String(req.body.fighter_id || ""); // fighter id
+    const room_code = String(req.body.room_code || "").toUpperCase();
+    const requester_id = String(req.body.player_id || "");
+    const fighter_raw = String(req.body.fighter_raw || "");
+    const fighter_id = String(req.body.fighter_id || "");
 
     if (!rooms[room_code]) {
         return res.status(404).json({
-            success: false, // fail
-            message: "Room not found" // message
+            success: false,
+            message: "Room not found"
         });
     }
 
-    const room = rooms[room_code]; // room
-    ensureCharSelect(room); // ensure char select
+    const room = rooms[room_code];
+    ensureCharSelect(room);
 
     if (requester_id === room.host) {
-        room.char_select.p1_raw = fighter_raw; // host raw
-        room.char_select.p1_id = fighter_id; // host p1
+        room.char_select.p1_raw = fighter_raw;
+        room.char_select.p1_id = fighter_id;
     } else if (requester_id === room.guest) {
-        room.char_select.p2_raw = fighter_raw; // guest raw
-        room.char_select.p2_id = fighter_id; // guest p2
+        room.char_select.p2_raw = fighter_raw;
+        room.char_select.p2_id = fighter_id;
     } else {
         return res.status(403).json({
-            success: false, // fail
-            message: "Player is not part of this room" // message
+            success: false,
+            message: "Player is not part of this room"
         });
     }
 
-    res.json(makeRoomState(room, requester_id)); // updated state
+    res.json(makeRoomState(room, requester_id));
 });
 
 app.post("/select_stage", (req, res) => {
-    const room_code = String(req.body.room_code || "").toUpperCase(); // room code
-    const requester_id = String(req.body.player_id || ""); // requester
-    const stage_path = String(req.body.stage_path || ""); // stage path
+    const room_code = String(req.body.room_code || "").toUpperCase();
+    const requester_id = String(req.body.player_id || "");
+    const stage_path = String(req.body.stage_path || "");
 
     if (!rooms[room_code]) {
         return res.status(404).json({
-            success: false, // fail
-            message: "Room not found" // message
+            success: false,
+            message: "Room not found"
         });
     }
 
-    const room = rooms[room_code]; // room
-    ensureCharSelect(room); // ensure char select
-    room.char_select.stage_path = stage_path; // save stage
+    const room = rooms[room_code];
+    ensureCharSelect(room);
+    room.char_select.stage_path = stage_path;
 
-    res.json(makeRoomState(room, requester_id)); // updated state
+    res.json(makeRoomState(room, requester_id));
 });
 
 app.post("/update_fight_state", (req, res) => {
-    const room_code = String(req.body.room_code || "").toUpperCase(); // room code
-    const requester_id = String(req.body.player_id || ""); // requester
-    const state = req.body.state || {}; // incoming state
+    const room_code = String(req.body.room_code || "").toUpperCase();
+    const requester_id = String(req.body.player_id || "");
+    const state = req.body.state || {};
 
     if (!rooms[room_code]) {
         return res.status(404).json({
-            success: false, // fail
-            message: "Room not found" // message
+            success: false,
+            message: "Room not found"
         });
     }
 
-    const room = rooms[room_code]; // room
-    ensureFightState(room); // ensure fight state
+    const room = rooms[room_code];
+    ensureFightState(room);
 
     if (requester_id === room.host) {
-        room.fight_state.p1_state = sanitizeState(state, 1); // host writes p1
+        room.fight_state.p1_state = sanitizeState(state, 1);
     } else if (requester_id === room.guest) {
-        room.fight_state.p2_state = sanitizeState(state, 2); // guest writes p2
+        room.fight_state.p2_state = sanitizeState(state, 2);
     } else {
         return res.status(403).json({
-            success: false, // fail
-            message: "Player is not part of this room" // message
+            success: false,
+            message: "Player is not part of this room"
         });
     }
 
-    res.json(makeRoomState(room, requester_id)); // return full state
+    res.json(makeRoomState(room, requester_id));
 });
 
 app.post("/fight_state", (req, res) => {
-    const room_code = String(req.body.room_code || "").toUpperCase(); // room code
-    const requester_id = String(req.body.player_id || ""); // requester
+    const room_code = String(req.body.room_code || "").toUpperCase();
+    const requester_id = String(req.body.player_id || "");
 
     if (!rooms[room_code]) {
         return res.status(404).json({
-            success: false, // fail
-            message: "Room not found" // message
+            success: false,
+            message: "Room not found"
         });
     }
 
-    const room = rooms[room_code]; // room
-    ensureFightState(room); // ensure fight state
-    res.json(makeRoomState(room, requester_id)); // full fight state
+    const room = rooms[room_code];
+    ensureFightState(room);
+    res.json(makeRoomState(room, requester_id));
 });
 
-const PORT = process.env.PORT || 3000; // port
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-    console.log("Server running on port " + PORT); // boot log
+    console.log("Server running on port " + PORT);
 });
