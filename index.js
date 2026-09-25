@@ -575,6 +575,143 @@ app.post("/join_room", (req, res) => {
     });
 });
 
+app.post("/find_match", (req, res) => {
+    const playerId = String(
+        req.body.player_id ||
+        ("player_" + Date.now())
+    ).trim();
+
+    const gamertag = String(
+        req.body.gamertag || "Player"
+    ).trim();
+
+    const developerToken = String(
+        req.body.developer_token || ""
+    );
+
+    if (playerId === "") {
+        return res.status(400).json({
+            success: false,
+            message: "Player ID is required."
+        });
+    }
+
+    markPlayerOnline(playerId, gamertag);
+
+    const reservedDeveloperName =
+        isReservedDeveloperGamertag(gamertag);
+
+    const verifiedDeveloper =
+        verifyDeveloperToken(
+            developerToken,
+            gamertag
+        );
+
+    if (
+        reservedDeveloperName &&
+        !verifiedDeveloper
+    ) {
+        return res.status(403).json({
+            success: false,
+            message:
+                "Developer verification is required for this gamertag."
+        });
+    }
+
+    // Remove any old room owned/joined by this player.
+    for (const code of Object.keys(rooms)) {
+        const room = rooms[code];
+
+        if (room.host === playerId) {
+            delete rooms[code];
+            continue;
+        }
+
+        if (room.guest === playerId) {
+            room.guest = null;
+            room.guest_tag = "Player Two";
+            room.guest_is_developer = false;
+            room.status = "waiting";
+        }
+    }
+
+    // Look for another player's waiting room.
+    for (const code of Object.keys(rooms)) {
+        const room = rooms[code];
+
+        if (
+            room.status === "waiting" &&
+            room.guest === null &&
+            room.host !== playerId
+        ) {
+            room.guest = playerId;
+            room.guest_tag = gamertag;
+            room.guest_is_developer =
+                verifiedDeveloper;
+
+            room.status = "full";
+
+            return res.json({
+                success: true,
+                matched: true,
+                created: false,
+                room_code: code,
+                host_tag: room.host_tag,
+                guest_tag: room.guest_tag,
+                host_is_developer:
+                    room.host_is_developer === true,
+                guest_is_developer:
+                    room.guest_is_developer === true,
+                is_host: false,
+                assigned_side: 2,
+                message: "Match found"
+            });
+        }
+    }
+
+    // Nobody waiting, so become the host.
+    const code = generateCode();
+
+    rooms[code] = {
+        code: code,
+        host: playerId,
+        host_tag: gamertag,
+        host_is_developer: verifiedDeveloper,
+        guest: null,
+        guest_tag: "Player Two",
+        guest_is_developer: false,
+        status: "waiting",
+
+        char_select: {
+            p1_raw: "",
+            p1_id: "",
+            p2_raw: "",
+            p2_id: "",
+            stage_path: ""
+        },
+
+        fight_state: {
+            p1_state: defaultPlayerState(1),
+            p2_state: defaultPlayerState(2)
+        }
+    };
+
+    return res.json({
+        success: true,
+        matched: false,
+        created: true,
+        room_code: code,
+        host_tag: gamertag,
+        guest_tag: "Player Two",
+        host_is_developer:
+            verifiedDeveloper,
+        guest_is_developer: false,
+        is_host: true,
+        assigned_side: 1,
+        message: "Waiting for opponent"
+    });
+});
+
 app.post("/leave_room", (req, res) => {
     const roomCode = String(
         req.body.room_code || ""
