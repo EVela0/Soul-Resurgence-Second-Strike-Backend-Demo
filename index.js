@@ -23,6 +23,18 @@ const DEVELOPER_GAMERTAGS = new Set([
     "thenikgaming"
 ]);
 
+const DISABLED_FIGHTERS = new Set([
+    "chorus"
+]);
+
+function isFighterEnabled(fighterId, fighterRaw) {
+    const id = String(fighterId || "").toLowerCase().trim();
+    const raw = String(fighterRaw || "").toLowerCase().trim();
+
+    return !DISABLED_FIGHTERS.has(id) &&
+           !DISABLED_FIGHTERS.has(raw);
+}
+
 const DEVELOPER_PASSWORD =
     process.env.DEVELOPER_PASSWORD || "";
 
@@ -320,6 +332,13 @@ function makeRoomState(room, requesterId) {
         p1_state: room.fight_state.p1_state,
         p2_state: room.fight_state.p2_state
     };
+}
+
+if (!isFighterEnabled(fighter_id, fighter_raw)) {
+    return res.status(403).json({
+        success: false,
+        message: "Chorus is currently unavailable."
+    });
 }
 
 app.get("/", (_req, res) => {
